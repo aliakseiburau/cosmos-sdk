@@ -62,6 +62,22 @@ func (cfg *Config) UpgradeInfoFilePath() string {
 	return filepath.Join(cfg.Home, "data", defaultFilename)
 }
 
+// SymLinkToRequiredBinary try to predict what binary required for current state of the network
+// if there is node without state it use genesis binary, if there already some upgrades happened,
+// use binary required for this upgrade
+func (cfg *Config) SymLinkToRequiredBinary() (string, error) {
+	ui := cfg.UpgradeInfo()
+	if ui.Name != "" {
+		if err := cfg.SetCurrentUpgrade(ui); err != nil {
+			return "", err
+		}
+
+		return filepath.Join(cfg.Root(), upgradesDir, ui.Name), nil
+	}
+
+	return cfg.SymLinkToGenesis()
+}
+
 // SymLinkToGenesis creates a symbolic link from "./current" to the genesis directory.
 func (cfg *Config) SymLinkToGenesis() (string, error) {
 	genesis := filepath.Join(cfg.Root(), genesisDir)
@@ -82,7 +98,7 @@ func (cfg *Config) CurrentBin() (string, error) {
 	info, err := os.Lstat(cur)
 	if err != nil {
 		// Create symlink to the genesis
-		return cfg.SymLinkToGenesis()
+		return cfg.SymLinkToRequiredBinary()
 	}
 	// if it is there, ensure it is a symlink
 	if info.Mode()&os.ModeSymlink == 0 {
